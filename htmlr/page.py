@@ -1,36 +1,36 @@
-from .base import htmlr
+from .base import Htmlr
 
 # doctype
-class doctype(htmlr):
+class doctype(Htmlr):
     _name = "!DOCTYPE"
     _attributes = {'html': None}
     _close = False
 
 # html tags
-class html(htmlr): pass
-class head(htmlr): pass
-class meta(htmlr): pass
-class link(htmlr): pass
-class title(htmlr): pass
-class style(htmlr): pass
-class body(htmlr): pass
-class div(htmlr): pass
-class hr(htmlr): pass
-class br(htmlr): pass
-class p(htmlr): pass
-class a(htmlr): pass
+class html(Htmlr): pass
+class head(Htmlr): pass
+class meta(Htmlr): pass
+class link(Htmlr): pass
+class title(Htmlr): pass
+class style(Htmlr): pass
+class body(Htmlr): pass
+class div(Htmlr): pass
+class hr(Htmlr): pass
+class br(Htmlr): pass
+class p(Htmlr): pass
+class a(Htmlr): pass
         
 # html header tags
-class h1(htmlr): pass
-class h2(htmlr): pass
-class h3(htmlr): pass
-class h4(htmlr): pass
-class h5(htmlr): pass
-class h6(htmlr): pass
-class h7(htmlr): pass
+class h1(Htmlr): pass
+class h2(Htmlr): pass
+class h3(Htmlr): pass
+class h4(Htmlr): pass
+class h5(Htmlr): pass
+class h6(Htmlr): pass
+class h7(Htmlr): pass
 
 # html misc tags
-class script(htmlr):
+class script(Htmlr):
     _empty_element = False
-class style(htmlr): pass
+class style(Htmlr): pass
     

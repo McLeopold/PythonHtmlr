@@ -1,9 +1,9 @@
-from .base import htmlr
+from .base import Htmlr
 
 # html form tags
-class form(htmlr):
+class form(Htmlr):
     _attributes = {'method': 'POST', 'action': ''}
-class input_(htmlr):
+class input_(Htmlr):
     _name = "input"
     _attributes = {"type": "", "value": ""}
 class button(input_):
@@ -14,12 +14,12 @@ class checkbox(input_):
     _attributes = {"type": "checkbox", "value": ""}
 class radio(input_):
     _attributes = {"type": "radio", "value": ""}
-class textarea(htmlr): pass
-class select(htmlr): pass
+class textarea(Htmlr): pass
+class select(Htmlr): pass
 class fileinput(input_):
     _attributes = {'type': 'file'}
 
-class hidden(htmlr):
+class hidden(Htmlr):
     _name = 'input'
     _attributes = {'type': 'hidden'}
     def __init__(self, name, value, *nodes, **attributes):

@@ -1,10 +1,10 @@
-from .base import htmlr
+from .base import Htmlr
 
 # html table tags
-class table(htmlr): pass
-class thead(htmlr): pass
-class tbody(htmlr): pass
-class tfoot(htmlr): pass
-class tr(htmlr): pass
-class th(htmlr): pass
-class td(htmlr): pass
+class table(Htmlr): pass
+class thead(Htmlr): pass
+class tbody(Htmlr): pass
+class tfoot(Htmlr): pass
+class tr(Htmlr): pass
+class th(Htmlr): pass
+class td(Htmlr): pass

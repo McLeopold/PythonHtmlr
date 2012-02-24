@@ -2,13 +2,13 @@ import unittest
 import logging
 
 from htmlr import htmlr, htmlrlist
-from htmlr.htmlr.page import (
+from htmlr.page import (
                              div,
                              html, head, title, body, h1)
-from htmlr.htmlr.form import (
+from htmlr.form import (
                              form, input, text, textarea, hidden,
                              button, radio, checkbox)
-from htmlr.htmlr.table import (
+from htmlr.table import (
                              table, thead, tbody, tr, td, th)
 
 class Test_htmlr(unittest.TestCase):

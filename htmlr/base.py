@@ -19,27 +19,27 @@ def update_templates(item):
         else:
             templates.append(item)
 
-class htmlr(object):
+class Htmlr(object):
     '''
     Expected behavior
     passing nodes and attributes in creation
     
-    .add will add nodes and attributes to single htmlr
-    .add will add nodes and attributes to all htmlr's in an htmlrlist
-    .addend (htmlrlist only) will add nodes and attributes to last object only
+    .add will add nodes and attributes to single Htmlr
+    .add will add nodes and attributes to all Htmlr's in an HtmlrList
+    .addend (HtmlrList only) will add nodes and attributes to last object only
         used for chaining (__getattr__)
     
-    .format will add formatting parameters to single htmlr
-    .format will add formatting parameters to all htmlr's in an htmlrlist
+    .format will add formatting parameters to single Htmlr
+    .format will add formatting parameters to all Htmlr's in an HtmlrList
     
-    .each will use htmlr or htmlrlist as template and copy for each item in list
-        can pass nodes and attributes as convenience to all htmlr's in htmlrlist
+    .each will use Htmlr or HtmlrList as template and copy for each item in list
+        can pass nodes and attributes as convenience to all Htmlr's in HtmlrList
     .each special case
-        if passed an htmlr or htmlrlist, will put that as sub node in each item
+        if passed an Htmlr or HtmlrList, will put that as sub node in each item
         once for each item in the formatlist or else the formatdict
 
-    .__getattr__ (on the fly new tag) will append to the end of a htmlrlist
-        or turn a single htmlr into an htmlrlist
+    .__getattr__ (on the fly new tag) will append to the end of a HtmlrList
+        or turn a single Htmlr into an HtmlrList
     '''
     # default values, can be overridden by subclasses
     _name = None
@@ -56,7 +56,7 @@ class htmlr(object):
         self._formatdict = {}
         if not self.__class__._name is None:
             self._name = self.__class__._name
-        elif self.__class__.__name__ == 'htmlr' and nodes and \
+        elif self.__class__.__name__ == 'Htmlr' and nodes and \
          isinstance(nodes[0],str):
             self._name = nodes[0]
             nodes = nodes[1:]
@@ -76,8 +76,7 @@ class htmlr(object):
             self._attributes.update(self.__class__._attributes)
         else:
             self._attributes.update(attributes)
-        if self._name in ('html', '!DOCTYPE'):
-            update_templates(self)
+        update_templates(self)
 
     def __contains__(self, item):
         if self == item:
@@ -95,12 +94,12 @@ class htmlr(object):
         if name in _chain_classes:
             obj = _chain_classes[name]()
         else:
-            obj = htmlr(name)
+            obj = Htmlr(name)
             # pick up the namespace of the creating class?
             # this might confuse xslt
             if self._namespace:
                 obj._namespace = self._namespace
-        objs = htmlrlist(self,obj)
+        objs = HtmlrList(self,obj)
         # return add function of new object, but have function return 
         # a reference to the list
         return objs.addend.__get__(objs,objs.__class__)
@@ -123,34 +122,36 @@ class htmlr(object):
         self._formatdict.update(formatdict)
         return self
 
-    def each(self, items, *nodes, **attributes):
-        elements = htmlrlist()
-        if isinstance(items, (dict,)):
-            # create a number of elements, use value_ to get number
-            for key, value in items.items():
-                element = copy(self)
-                element.add(*nodes,**attributes)
-                element.format(key=key,value=value)
-                elements.append(element)
+    def each(self, items=None, *nodes, **attributes):
+        if items is None:
+            return HtmlrEach(self)
         else:
+            elements = HtmlrList()
             try:
-                iteritems = iter(items)
                 # create a number of elements, use value_ to get number
-                for item in iteritems:
+                for key, value in items.items():
                     element = copy(self)
                     element.add(*nodes,**attributes)
-                    element.format(item) # unpack dicts and lists?
+                    element.format(key=key,value=value)
                     elements.append(element)
-            except TypeError:
-                # return single htmlr object, not htmlrlist list
-                elements = copy(self)
-                elements.add(*nodes,**attributes)
-                elements.format(items) # unpack?
-        return elements
+            except AttributeError:
+                try:
+                    # create a number of elements, use value_ to get number
+                    for item in items:
+                        element = copy(self)
+                        element.add(*nodes,**attributes)
+                        element.format(item) # unpack dicts and lists?
+                        elements.append(element)
+                except TypeError:
+                    # return single Htmlr object, not HtmlrList list
+                    elements = copy(self)
+                    elements.add(*nodes,**attributes)
+                    elements.format(items) # unpack?
+            return elements
 
     def __str__(self):
         def toxml(node):
-            if isinstance(node,(htmlr,htmlrlist)):
+            if isinstance(node,(Htmlr,HtmlrList)):
                 return str(node)
             elif isinstance(node,(list, tuple, set, frozenset)):
                 return ''.join([toxml(n) for n in node])
@@ -201,8 +202,10 @@ class htmlr(object):
                     xml += "</{0}>".format(self._name)
         try:
             xml = xml.format(*self._formatlist,**self._formatdict)
-        except:
-            pass
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(xml, self._formatlist, self._formatdict)
         return xml
     
     def __format__(self, formatspec):
@@ -213,7 +216,7 @@ class htmlr(object):
             indent = int(formatspec)
         indentstr = "    " * indent
         def toxml(node):
-            if isinstance(node,(htmlr,htmlrlist)):
+            if isinstance(node,(Htmlr,HtmlrList)):
                 return format(node,str(indent+1)) + "\n"
             elif isinstance(node,(list,tuple,set,frozenset)):
                 return ''.join([toxml(n) for n in node])
@@ -246,13 +249,30 @@ class htmlr(object):
             pass
         return xml
 
-class htmlrlist(object):
+class HtmlrEach(Htmlr):
+
+    def __init__(self, node):
+        super(HtmlrEach, self).__init__()
+        self._node = node
+
+    def __str__(self):
+        items = self._formatlist or self._formatdict or None
+        if items is not None:
+            elements = self._node.each(items)
+        else:
+            print('HtmlrEach not iterated')
+            elements = self._node
+        return str(elements)
+
+
+class HtmlrList(object):
     def __init__(self, *items):
         self.myitems = list(items)
-        for item in items:
-            if item._name in ('html', '!DOCTYPE'):
-                update_templates(self)
-                break
+        #for item in items:
+        #    if item._name in ('html', '!DOCTYPE'):
+        #        update_templates(self)
+        #        break
+        update_templates(self)
         
     def __contains__(self, item):
         return item in self.myitems
@@ -261,11 +281,11 @@ class htmlrlist(object):
         return self.myitems
     
     def __copy__(self):
-        newhtmlrlist = htmlrlist()
+        newHtmlrList = HtmlrList()
         for item in self.myitems:
             newhtmlr = copy(item)
-            newhtmlrlist.append(newhtmlr)
-        return newhtmlrlist
+            newHtmlrList.append(newhtmlr)
+        return newHtmlrList
     
     def append(self, item):
         self.myitems.append(item)
@@ -274,7 +294,7 @@ class htmlrlist(object):
         if name in _chain_classes:
             obj = _chain_classes[name]()
         else:
-            obj = htmlr(name)
+            obj = Htmlr(name)
         self.myitems.append(obj)
         return self.addend.__get__(self,self.__class__)
 
@@ -295,13 +315,13 @@ class htmlrlist(object):
     def each(self, items, *nodes, **attributes):
         # if passing in a normal iterator
         #     chain what is created to end of existing list using last item as template
-        # pass in htmlr or htmlrlist, use as template for creating sub nodes
+        # pass in Htmlr or HtmlrList, use as template for creating sub nodes
         #    for each item in this lists items format list
-        if isinstance(items,(htmlr,htmlrlist)):
+        if isinstance(items,(Htmlr,HtmlrList)):
             for item in self.myitems:
-                # put template in as node of each item in this htmlrlist
+                # put template in as node of each item in this HtmlrList
                 # clone lists?
-                if isinstance(item, htmlr):
+                if isinstance(item, Htmlr):
                     obj = copy(items)
                     obj.add(*nodes,**attributes)
                     if item._formatlist:
@@ -309,10 +329,10 @@ class htmlrlist(object):
                     elif item._formatdict:
                         obj = obj.each(item._formatdict)
                     item.add(obj) # adds as sub node
-                elif isinstance(item, htmlrlist):
+                elif isinstance(item, HtmlrList):
                     item.each(items,*nodes,**attributes) # simple recursive
         else:
-            elements = htmlrlist()
+            elements = HtmlrList()
             if isinstance(items, (dict,)):
                 # create a number of elements, use value_ to get number
                 for key, value in items.items():
@@ -333,7 +353,7 @@ class htmlrlist(object):
                             element.format(item)
                             elements.append(element)
                 except TypeError:
-                    # call format on htmlrlist
+                    # call format on HtmlrList
                     elements = self.myitems
                     self.add(*nodes,**attributes)
                     self.format(items)
@@ -347,7 +367,7 @@ class htmlrlist(object):
         return '\n'.join([format(item, formatspec) for item in self.myitems])
 
 # keeps list of subclassed htmlr objects for chaining syntax
-_chain_classes = {'htmlr': htmlr}
+_chain_classes = {'Htmlr': Htmlr}
 def update_classes():
     _classes = {}
     def itersubclasses(cls):
@@ -355,32 +375,38 @@ def update_classes():
             if sub.__name__ not in _classes:
                 _classes[sub.__name__] = sub
                 itersubclasses(cls)
-    itersubclasses(htmlr)
+    itersubclasses(Htmlr)
     _chain_classes.update(_classes)
 
 # renders all templates to file
-def render(outfile=stdout):
+def render(data=None, outfile=stdout):
     for template in templates:
-        outfile.write(str(template)+'\n')
+        try:
+            outfile.write(str(template.format(**data)) + '\n')
+        except TypeError:
+            try:
+                outfile.write(str(template.format(*data)) + '\n')
+            except TypeError:
+                outfile.write(str(template.format(data)) + '\n')
 
-__all__ = ['htmlr', 'htmlrlist', 'update_classes', 'render']
+__all__ = ['Htmlr', 'HtmlrList', 'HtmlrEach', 'update_classes', 'render']
 
 if __name__ == "__main__":
     from htmlr.page import div
     print(div("{0} {1}").format(["hello","world"]))
     
-    # using htmlr
+    # using Htmlr
     # simplest example
     print(div())
     # <div />
     
     # add stuff to tag
-    # note attributes are first in xml and last in htmlr
+    # note attributes are first in xml and last in Htmlr
     print(div("hello",id=1))
     # <div id="1">hello</div>"
     
     # create class with defaults
-    class div(htmlr):
+    class div(Htmlr):
         _nodes = ["hello"]
         _attributes = {"id": 1}
     print(div())
@@ -396,7 +422,7 @@ if __name__ == "__main__":
     # <div id="1" name="first">helloworld</div>
     
     # reset for examples
-    class div(htmlr): pass
+    class div(Htmlr): pass
     
     # add formatting
     print(div("{0} {1}").format(["hello","world"]))
@@ -405,18 +431,18 @@ if __name__ == "__main__":
     # <div id="1">scott</div>
     
     # create class with different name
-    class mydiv(htmlr):
+    class mydiv(Htmlr):
         _name = "div"
         _attributes = {"class": "mydiv"}
     print(mydiv())
     # <div class="mydiv" />
     
-    # using htmlrlist
+    # using HtmlrList
     # chain a tag after a tag
     print(div().mydiv())
     # <div /><div class="mydiv" />
     
-    # chaining looks for existing htmlr class with name, otherwise it creates a tag
+    # chaining looks for existing Htmlr class with name, otherwise it creates a tag
     del mydiv
     print(div().mydiv())
     # <div /><mydiv />
