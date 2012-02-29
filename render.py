@@ -1,5 +1,43 @@
 #!/usr/bin/env python2
 
+INDENT = "    "
+
+class NodeString(str):
+
+    def __init__(self, value=''):
+        self._name = '*str-'
+        self._datalist = []
+        self._datadict = []
+
+    def __add__(self, other):
+        if isinstance(other, Node):
+            if (len(other) > 0 and
+                    isinstance(other[0], NodeString)):
+                other[0] = self +other[0]
+            else:
+                other.insert(0, self)
+            return other
+        else:
+            return NodeString(str(self) + str(other))
+
+    def __radd__(self, other):
+        if isinstance(other, Node):
+            if (len(other) > 0 and
+                    isinstance(other[-1], NodeString)):
+                other[-1] += self
+            else:
+                other.append(self)
+            return other
+        else:
+            return NodeString(str(other) + str(self))
+
+    def display(self, indent, *datalist, **datadict):
+        if self == '':
+            return ''
+        else:
+            return INDENT * indent + str(self) + '\n'
+
+
 class Node(list):
 
     def __init__(self, name=None):
@@ -8,8 +46,16 @@ class Node(list):
         self._datalist = []
         self._datadict = {}
 
-    def __repr__(self):
-        return self.display(0, *self._datalist, **self._datadict)
+    def __iadd__(self, other):
+        if (len(self) > 0 and
+                len(other) > 0 and
+                isinstance(self[-1], NodeString) and
+                isinstance(other[0], NodeString)):
+            self[-1] += other[0]
+            self.extend(other[1:])
+        else:
+            self.extend(other)
+        return self
 
     # extend built-in list functions and return self for cascading
     def append(self, *items):
@@ -48,26 +94,43 @@ class Node(list):
         return self
 
     def display(self, indent=0, *datalist, **datadict):
-        print('displaying {0}'.format(self._name))
         if self._name is None:
             # Node is list of siblings without container
-            return '\n'.join(item.display(indent, *datalist, **datadict)
-                             if isinstance(item, Node) else str(item)
-                             for item in self)
+            return ''.join(item.display(indent, *datalist, **datadict)
+                           for item in self)
         else:
-            return ' '.join(("    " * indent,
-                             self._name, 
-                             str(datadict),
-                             str(list(datalist)), 
-                             ''.join('\n' + node.display(indent + 1, *datalist, **datadict) 
-                                     for node in self)))
+            return ''.join((INDENT * indent,
+                            self._name, ' ',
+                            str(datadict), ' ',
+                            str(list(datalist)),
+                            '\n',
+                            ''.join(node.display(indent + 1, *datalist, **datadict)
+                                    for node in self)))
 
     def compile_nodes(self):
+        nodes = Node()
+        for node in self:
+            nodes += node.compile()
+        return nodes
+
+    def compile(self):
+        nodes = self.compile_nodes()
+        if self._name is None:
+            return nodes
+        else:
+            return NodeString('<' + self._name + '>') + nodes
+
+    def render_nodes(self, *datalist, **datadict):
         s = ['']
         for node in self:
-            result = node.compile()
+            result = node.render(*datalist, **datadict)
             if isinstance(result, Node) or isinstance(s[-1], Node):
-                s.append(result)
+                if len(result) <= 1:
+                    s.append(result)
+                else:
+                    # should have len >= 3
+                    s[-1] += result.pop(0)
+                    s.extend(result)
             else:
                 s[-1] = s[-1] + result
         if isinstance(s[-1], Node):
@@ -77,8 +140,8 @@ class Node(list):
         else:
             return self.__class__().extend(s)
 
-    def compile(self):
-        nodes = self.compile_nodes()
+    def render(self, *datalist, **datadict):
+        nodes = self.render_nodes(*datalist, **datadict)
         if self._name is None:
             return nodes
         else:
@@ -89,72 +152,124 @@ class Node(list):
                 result = '<' + self._name + '>' + nodes
             return result
 
-class NodeProxy(Node):
-
-    def __init__(self, node):
-        if isinstance(node, Node):
-            self._node = node
-            self._name = 'proxy-{0}'.format(node._name)
-        else:
-            self._node = NodeString(node)
-    
-    def __repr__(self):
-        if isinstance(self._node, Node):
-            return self.display(0, *self._node._datalist, **self._node._datadict)
-        else:
-            return self.display(0, self._node)
-
-    def add(self, *nodes):
-        self._node.extend(nodes)
-        return self
-
-    def format(self, *datalist, **datadict):
-        self._node.format(*datalist, **datadict)
-        return self
-
-    def display(self, indent=0, *datalist, **datadict):
-        print('displaying {0}'.format(self._name))
-        if isinstance(self._node, Node):
-            return self._node.display(indent, *datalist, **datadict)
-
-    def __getattr__(self, name):
-        if name == '_datalist':
-            return self._node._datalist
-        elif name == '_datadict':
-            return self._node._datadict
 
 def each(*items):
     def wrapper(node):
         return NodeEach(node, *items)
     return wrapper
 
-class NodeString(object):
-    def __init__(self, s):
-        if isinstance(s, NodeString):
-            s = s.s
-        self.s = s
-        self._name = '*str-'
-    def display(self, indent, *datalist, **datadict):
-        return "    " * indent + self.s
-    def __repr__(self):
-        return self.display(0)
-    def __getattr__(self, name):
-        if name == '_datalist':
-            return []
-        elif name == '_datadict':
-            return {}
-        else:
-            return None
 
-class NodeEach(NodeProxy):
+class NodeEach(Node):
 
-    def __init__(self, node, *items):
-        super(NodeEach, self).__init__(node)
-        self._items = items if len(items) > 0 else None
-        self._name = '+each-{0}'.format(items)
+    def __init__(self, node, *itemlist, **itemdict):
+        self._name = node._name
+        self._datalist = list(itemlist) or node._datalist
+        self._datadict = itemdict or node._datadict
+        self.extend(node)
 
     def display(self, indent=0, *datalist, **datadict):
-        print('displaying {0}'.format(self._name))
+        # if self._items is None:
+        #     if isinstance(self._node, Node):
+        #         data = self._node._datalist or self._node._datadict
+        #     else:
+        #         self._node = NodeString(self._node)
+        #         data = None
+        #     data = data or datalist or datadict or None
+        # else:
+        #     data = self._items
+        data = self._datalist or self._datadict or datalist or datadict or None
+        s = ''.join((INDENT * indent,
+                     '+each-{0}{1}'.format(self._datalist, self._datadict), ' ',
+                     str(data), ' ',
+                     str(datadict), ' ',
+                     str(list(datalist)),
+                     '\n'))
+        if data is None:
+            s += super(NodeEach, self).display(indent + 1)
+        else:
+            try:
+                # assume mapping
+                s += ''.join(super(NodeEach, self).display(indent + 1, key=key, value=value)
+                             for key, value in data.items())
+            except AttributeError as exc:
+                # mapping failed, assume sequence of mapping
+                try:
+                    s += ''.join(super(NodeEach, self).display(indent + 1, **item)
+                                 for item in data)
+                except TypeError as exc:
+                    # assume sequence of sequence
+                    try:
+                        s += ''.join(super(NodeEach, self).display(indent + 1, *item)
+                                     for item in data)
+                    except TypeError as exc:
+                        # assume sequence of scaler
+                        try:
+                            s += ''.join(super(NodeEach, self).display(indent + 1, item)
+                                         for item in data)
+                        except TypeError as exc:
+                            # ignore data
+                            s += super(NodeEach, self).display(indent + 1)
+
+#            try:
+#                for item in data:
+#                    try:
+#                        s += self._node.display(indent, **item)
+#                    except TypeError:
+#                        try:
+#                            if isinstance(item, (str, unicode)):
+#                                raise TypeError
+#                            s += self._node.display(indent, *item)
+#                        except TypeError:
+#                            s += self._node.display(indent, item)
+#            except TypeError:
+#                s += self._node.display(indent + 1)
+        return s
+
+    def compile(self):
+        nodes = Node()
+        if not (self._datalist or self._datadict):
+            nodes.append(
+                self.__class__(super(NodeEach, self).compile())
+                )
+            return nodes
+        else:
+            data = self._datalist or self._datadict
+            try:
+                # assume mapping
+                sub_nodes = [self._node.render(key=key, value=value)
+                         for key, value in data.items()]
+            except AttributeError as exc:
+                # mapping failed, assume sequence of mapping
+                try:
+                    sub_nodes = [self._node.render(**item)
+                             for item in data]
+                except TypeError as exc:
+                    # assume sequence of sequence
+                    try:
+                        sub_nodes = [self._node.render(*item)
+                                 for item in data]
+                    except TypeError as exc:
+                        # assume sequence of scaler
+                        try:
+                            sub_nodes = [self._node.render(item)
+                                     for item in data]
+                        except TypeError as exc:
+                            # ignore data
+                            sub_nodes = [self._node.compile()]
+
+            result_nodes = Node().append(NodeString())
+            for nodes in sub_nodes:
+                if isinstance(nodes, Node):
+                    result_nodes[-1] += nodes[0]
+                    result_nodes.extend(nodes[1:])
+                else:
+                    result_nodes[-1] += nodes
+            if len(result_nodes) == 1:
+                return result_nodes[0]
+            else:
+                return result_nodes
+
+    def render(self, *datalist, **datadict):
         if self._items is None:
             if isinstance(self._node, Node):
                 data = self._node._datalist or self._node._datadict
@@ -164,51 +279,60 @@ class NodeEach(NodeProxy):
             data = data or datalist or datadict or None
         else:
             data = self._items
-        s = ' '.join(("    " * indent,
-                      self._name, 
-                      str(data), 
-                      str(datadict),
-                      str(list(datalist))))
-        try:
-            for key, value in data.items():
-                s += '\n' + self._node.display(indent, key=key, value=value)
-        except AttributeError:
-            try:
-                for item in data:
-                    try:
-                        s += '\n' + self._node.display(indent, **item)
-                    except TypeError:
-                        try:
-                            if isinstance(item, (str, unicode)):
-                                raise TypeError
-                            s += '\n' + self._node.display(indent, *item)
-                        except TypeError:
-                            s += '\n' + self._node.display(indent, item)
-            except TypeError:
-                s += '\n' + self._node.display(indent + 1)
-        if isinstance(self._node, NodeString):
-            self._node = self._node.s
-        return s
-                                     
-    def compile(self):
-        result = self.__class__(self._node.compile())
-        return result
 
+        if data is None:
+            return self.__class__(self._node.compile())
+        else:
+            try:
+                # assume mapping
+                sub_nodes = [self._node.render(key=key, value=value)
+                         for key, value in data.items()]
+            except AttributeError as exc:
+                # mapping failed, assume sequence of mapping
+                try:
+                    sub_nodes = [self._node.render(**item)
+                             for item in data]
+                except TypeError as exc:
+                    # assume sequence of sequence
+                    try:
+                        sub_nodes = [self._node.render(*item)
+                                 for item in data]
+                    except TypeError as exc:
+                        # assume sequence of scaler
+                        try:
+                            sub_nodes = [self._node.render(item)
+                                     for item in data]
+                        except TypeError as exc:
+                            # ignore data
+                            sub_nodes = [self._node.compile()]
+
+            result_nodes = ['']
+            for nodes in sub_nodes:
+                if isinstance(nodes, Node):
+                    result_nodes[-1] += nodes[0]
+                    result_nodes.extend(nodes[1:])
+                else:
+                    result_nodes[-1] += nodes
+            return self.__class__(Node().extend(result_nodes))
 
 def extract(*extracts):
     def wrapper(node):
         return NodeExtract(node, *extracts)
     return wrapper
 
-class NodeExtract(NodeProxy):
+class NodeExtract(Node):
 
     def __init__(self, node, *extracts):
-        super(NodeExtract, self).__init__(node)
+        self._name = node._name
+        self._datalist = node._datalist
+        self._datadict = node._datadict
+        self.extend(node)
         self._extracts = extracts if len(extracts) > 0 else None
-        self._name = '=extract-{0}'.format(extracts)
 
     def extract_data(self, datalist, datadict):
         data = None
+        datalist = self._datalist or datalist
+        datadict = self._datadict or datadict
         try:
             for extract in self._extracts:
                 try:
@@ -221,135 +345,108 @@ class NodeExtract(NodeProxy):
         return data
 
     def display(self, indent=0, *datalist, **datadict):
-        print('displaying {0}'.format(self._name))
-        data = self.extract_data(datalist, datadict) or datalist or datadict
-        s = ' '.join(("    " * indent,
-                      self._name,
-                      str(data),
-                      str(datadict),
-                      str(list(datalist)),
-                      '\n'))
-        try:
-            return s + self._node.display(indent + 1, **data)
-        except TypeError:
+        data = self.extract_data(datalist, datadict)
+        s = ''.join((INDENT * indent,
+                     '=extract-{0}'.format(self._extracts), ' ',
+                     str(data), ' ',
+                     str(datadict), ' ',
+                     str(list(datalist)),
+                     '\n'))
+        if data is None:
+            return s + super(NodeExtract, self).display(indent + 1)
+        else:
             try:
-                if isinstance(data, (str, unicode)):
-                    raise TypeError
-                return s + self._node.display(indent + 1, *data)
+                return s + super(NodeExtract, self).display(indent + 1, **data)
             except TypeError:
-                return s + self._node.display(indent + 1, data)
-        
+                try:
+                    if isinstance(data, (str, unicode)):
+                        raise TypeError
+                    return s + super(NodeExtract, self).display(indent + 1, *data)
+                except TypeError:
+                    return s + super(NodeExtract, self).display(indent + 1, data)
+
     def compile(self):
-        result = self.__class__(self._node.compile())
-        return result
+        nodes = Node().append(
+            self.__class__(super(NodeExtract, self).compile(), *self._extracts)
+            )
+        return nodes
 
 
 table = Node('table').append(Node('thead').append(Node('tr').append(each()(Node('th')))))
 
 if __name__ == '__main__':
-    n = Node('table').append(Node('thead').append(Node('tr').append(each()(Node('th')))))
-    c = n.compile()
-    print(c)
+    import unittest
 
-    quit()
+    class TestNodes(unittest.TestCase):
 
-    n = Node('div').extract(0).each().extract('key')
-    print(n)
-    print
-    c = n.compile()
-    print(c)
-    print
+        def test_node(self):
+           n = Node('div')
+           self.assertEqual(n.display(), "div {} []\n")
 
-    n = Node('div').append(Node().append(Node('section'), Node('article')).each())
-    print(n)
-    print
-    c = n.compile()
-    print(c)
-    print
-    print([i for i in c])
-    print
+        def test_node_sibling(self):
+           n = Node().append(Node('one'), Node('two'))
+           self.assertEqual(n.display(), "one {} []\n"
+                                         "two {} []\n")
 
-    n = Node('div')
-    print(n.display(0, 1, 2))
-    print
+        def test_node_child(self):
+           n = Node('one').append(Node('two'))
+           self.assertEqual(n.display(), "one {} []\n"
+                                         "    two {} []\n")
 
-    n = extract(0)(Node('div'))
-    print(n.display(0, 1, 2))
-    print
+        def test_each(self):
+           n = each()(Node('div'))
+           self.assertEqual(n.display(), "+each-[]{} None {} []\n"
+                                         "    div {} []\n")
 
-    n = Node('div').extract(0)
-    print(n.display(0, 1, 2))
-    print
+        def test_each_const(self):
+           n = each('a', 'b')(Node('div'))
+           self.assertEqual(n.display(), "+each-['a', 'b']{} ['a', 'b'] {} []\n"
+                                         "    div {} ['a']\n"
+                                         "    div {} ['b']\n")
 
-    n = each()(Node('div'))
-    print(n.display(0, 1, 2))
-    print
+        def test_extract(self):
+           n = extract('key')(Node('div'))
+           self.assertEqual(n.display(), "=extract-('key',) None {} []\n"
+                                         "    div {} []\n")
 
-    n = Node('div').each()
-    print(n.display(0, 1, 2))
-    print
+        def test_compile_simple(self):
+           n = Node('html').append(Node('head'), Node('body'))
+           c = n.compile()
+           self.assertEqual(c.display(), "<html><head><body>\n")
 
-    n = each()(Node('div').append(
-        each()
-        (Node('div'))
-    ))
-    print(n.display(0, [1,2], [3,4]))
-    print
+        def test_compile_extract(self):
+           n = Node('table').append(Node('thead'), extract('fields')(Node('tbody')))
+           c = n.compile()
+           self.assertEqual(c.display(), "<table><thead>\n"
+                                         "=extract-('fields',) None {} []\n"
+                                         "    <tbody>\n")
 
-    n = each()(Node('div').append(
-        each('a', 'b')
-        (Node('div')).format('a', 'b')
-    ))
-    print(n.display(0, [1,2], [3,4]))
-    print
+        def test_compile_each(self):
+           n = Node('table').append(Node('thead').append(Node('tr').append(each()(Node('th')))))
+           c = n.compile()
+           self.assertEqual(c.display(), "<table><thead><tr>\n"
+                                         "+each-[]{} None {} []\n"
+                                         "    <th>\n")
 
-    n = each()(Node('div').append(
-        each()
-        (Node('div')).format('a', 'b')
-    ))
-    print(n.display(0, [1,2], [3,4]))
-    print
+        def test_compile_each_const(self):
+            n = each(1, 2)(Node('div'))
+            c = n.compile()
+            self.assertEqual(c.display(), "+each-[1, 2]{} [1, 2] {} []\n"
+                                          "    <div>")
 
-    table1 = [{'id': 1, 'name': 'scott'},
-              {'id': 2, 'name': 'mike'}]
+        # def test_compile_full_table(self):
+        #     fields = ['one', 'two']
+        #     n = Node('table').append(
+        #         Node('thead').append(Node('tr').append(each(*fields)(Node('th')))),
+        #         Node('tbody').append(each()(Node('tr').append(each()(Node('td'))))),
+        #         Node('tfoot').append(Node('tr').append(each(*fields)(Node('th')))))
+        #     print(n.display(0))
+        #     c = n.compile()
+        #     print(c.display(0))
+        #     self.assertEqual(str(c), "<table><thead><tr><th><th><tbody>\n"
+        #                              "+each-() None {} []\n"
+        #                              "    <tr>\n"
+        #                              "    +each-() None {} []\n"
+        #                              "        <td>\n<tfoot><tr><th><th>\n")
 
-    table2 = {'fields': ['id', 'name'],
-              'values': [[1, 'scott'],
-                         [2, 'mike']]}
-
-    a = Node('table')
-    b = Node('thead')
-    c = Node('tr')
-    d = Node('th').extract('key').each().extract(0)
-    e = Node('tbody')
-    f = Node('tr').each()
-    g = Node('td').each()
-    h = Node('tfoot')
-
-    a.append(b, e, h)
-    b.append(c)
-    c.append(d)
-    e.append(f)
-    f.append(g)
-
-    c = a.compile()
-    print(c)
-    print(a.display(0, *table1))
-    print
-
-    a = Node('table')
-    b = Node('thead')
-    c = Node('tr')
-    d = Node('th').each().extract('fields')
-    e = Node('tbody')
-    f = Node('tr').each().extract('values')
-    g = Node('td').each()
-    h = Node('tfoot')
-
-    a.append(b, e, h)
-    b.append(c)
-    c.append(d)
-    e.append(f)
-    f.append(g)
-
-    print(a.display(0, **table2))
+    unittest.main()
