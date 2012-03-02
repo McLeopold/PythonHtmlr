@@ -1,4 +1,4 @@
-from .base import Htmlr, HtmlrList
+from .base import Htmlr
 
 # list tags
 class ol(Htmlr): pass
@@ -14,10 +14,10 @@ class dl(Htmlr):
         self._nodes.append(dlist)
 class dt(Htmlr): pass
 class dd(Htmlr): pass
-class dtdd(HtmlrList):
-    def __init__(self, dttext, ddtext, **attributes):
-        super(dtdd,self).__init__()
-        self.append(dt(dttext))
-        self.append(dd(ddtext))
-        self.add(**attributes)
+# class dtdd(HtmlrList):
+#     def __init__(self, dttext, ddtext, **attributes):
+#         super(dtdd,self).__init__()
+#         self.append(dt(dttext))
+#         self.append(dd(ddtext))
+#         self.add(**attributes)
 

@@ -1,7 +1,7 @@
 import unittest
 import logging
 
-from htmlr import htmlr, htmlrlist
+from htmlr import Htmlr, HtmlrList
 from htmlr.page import (
                              div,
                              html, head, title, body, h1)

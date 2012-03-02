@@ -3,6 +3,7 @@ from .page import *
 from .lists import *
 from .tables import *
 from .forms import *
+from .html5 import *
 
 update_classes()
 

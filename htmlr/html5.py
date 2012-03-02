@@ -1,13 +1,13 @@
-from .base import htmlr
+from .base import Htmlr
 
 # html5 tags
-class section(htmlr): pass
-class nav(htmlr): pass
-class article(htmlr): pass
-class aside(htmlr): pass
-class hgroup(htmlr): pass
-class header(htmlr): pass
-class footer(htmlr): pass
-class time(htmlr): pass
-class mark(htmlr): pass
+class section(Htmlr): pass
+class nav(Htmlr): pass
+class article(Htmlr): pass
+class aside(Htmlr): pass
+class hgroup(Htmlr): pass
+class header(Htmlr): pass
+class footer(Htmlr): pass
+class time(Htmlr): pass
+class mark(Htmlr): pass
 
