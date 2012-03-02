@@ -1,10 +1,9 @@
 from htmlr import *
 
 doctype.html(
-    head(
+    head(lang="en")(
         meta(charset="utf-8"),
-        title("htmlr"),
-        lang="en"
+        title("htmlr")
     ),
     body(
         h1("Hello World")

@@ -11,11 +11,12 @@ def update_templates(item):
     if len(templates) == 0:
         templates.append(item)
     else:
-        if item in templates:
-            return
         for template in list(templates):
             if template in item:
                 templates.remove(template)
+        if item in templates:
+            return
+        for template in templates:
             if item in template:
                 break
         else:
@@ -61,7 +62,7 @@ class HtmlrString(str):
         if self == '':
             return ''
         else:
-            return INDENT * indent + str(self) + '\n'
+            return INDENT * indent + '*str ' + str(self) + '\n'
 
 
 class HtmlrMeta(type):
@@ -127,6 +128,10 @@ class Htmlr(list):
         self._addend = False
         update_templates(self)
 
+    def __eq__(self, other):
+        return (isinstance(other, Htmlr) and
+                    self._name == other._name)
+
     def __getattr__(self, name):
         # automatic creation of ad-hoc elements
         if name in _chain_classes:
@@ -162,6 +167,7 @@ class Htmlr(list):
         else:
             super(Htmlr, self).extend(nodes)
             self._attributes.update(attributes)
+        update_templates(self)
         return self
 
     def __iadd__(self, other):
@@ -237,7 +243,7 @@ class Htmlr(list):
                 try:
                     result += node.display(indent, *datalist, **datadict)
                 except AttributeError:
-                    result += INDENT * indent + str(node) + '\n'
+                    result += INDENT * indent + '*lit ' + str(node) + '\n'
             return result
             return ''.join(item.display(indent, *datalist, **datadict)
                            for item in self)
@@ -251,7 +257,7 @@ class Htmlr(list):
                 try:
                     result += node.display(indent + 1, *datalist, **datadict)
                 except AttributeError:
-                    result += INDENT * (indent + 1) + str(node) + '\n'
+                    result += INDENT * (indent + 1) + '*lit ' + str(node) + '\n'
             return result
 
     def get_open_tag(self):
@@ -545,15 +551,14 @@ def update_classes():
     _chain_classes.update(_classes)
 
 # renders all templates to file
-def render(data=None, outfile=stdout):
+def render(*datalist, **datadict):
+    if 'outfile' in datadict:
+        outfile = datadict.pop('outfile')
+    else:
+        outfile = stdout
     for template in templates:
-        try:
-            outfile.write(str(template.format(**data)) + '\n')
-        except TypeError:
-            try:
-                outfile.write(str(template.format(*data)) + '\n')
-            except TypeError:
-                outfile.write(str(template.format(data)) + '\n')
+        outfile.write(template.render(*datalist, **datadict))
+        outfile.write('\n')
 
 __all__ = ['HtmlrMeta', 'Htmlr', 'HtmlrString', 'HtmlrExtract', 'HtmlrEach',
            'update_classes', 'render', 'each', 'extract']

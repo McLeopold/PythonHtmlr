@@ -1,28 +1,33 @@
 from htmlr import *
 
-doctype().html(
-    head(
+doctype.html(
+    head(lang="en")(
         meta(charset="utf-8"),
-        title("sample table"),
-        lang="en"
+        title("{title}")
     ),
     body(
-        h1("sample table"),
-        table(
-            tr(
-                th("{id}")
+        h1("{title}"),
+        extract('data')(table(
+            thead(
+                tr(
+                    extract(0)(each()(
+                        th('{key}')
+                    ))
+                )
             ),
-            tr(
-                td("{name}")
+            tbody(
+                each()(tr(
+                    each()(td('{value}'))
+                ))
             )
-        ),
-        div().each()
+        ))
     )
 )
 
 if __name__ == "__main__":
-    data = [{'name': 'scott',
-             'id': 1},
-            {'name': 'mike',
-             'id': 2}]
-    render(data)
+    data = {'title': 'sample table',
+            'data': [{'name': 'scott',
+                      'id': 1},
+                     {'name': 'mike',
+                      'id': 2}]}
+    render(**data)
