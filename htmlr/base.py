@@ -22,6 +22,7 @@ def update_templates(item):
         else:
             templates.append(item)
 
+
 class HtmlrString(str):
 
     def __init__(self, value=''):
@@ -62,7 +63,18 @@ class HtmlrString(str):
         if self == '':
             return ''
         else:
-            return INDENT * indent + '*str ' + str(self) + '\n'
+            result = str(self)
+            try:
+                result = result.format(*datalist, **datadict)
+            except Exception as exc:
+                pass
+            result = ''.join((INDENT * indent,
+                              '*str ',
+                              result,
+                              ' ', str(list(datalist)),
+                              ' ', str(datadict),
+                              '\n'))
+            return result
 
 
 class HtmlrMeta(type):
@@ -73,13 +85,13 @@ class HtmlrMeta(type):
     # allows div.display() instead of div().display()
     # also allows div(div) instead of div(div())
     def __getattribute__(self, name):
-        if name == 'display':
-            return self().display
-        elif name == 'render':
-            return self().render
-        elif name == 'compile':
-            return self().compile
+        if name in {'display',
+                    'render',
+                    'compile',
+                    'format'}:
+            return self().__getattribute__(name)
         return type.__getattribute__(self, name)
+
 
 class Htmlr(list):
     __metaclass__ = HtmlrMeta
@@ -90,6 +102,7 @@ class Htmlr(list):
     _alias = {'class_', 'class'}
     _close = True
     _empty_element = True
+    _inited = False
 
     def __init__(self, *nodes, **attributes):
         # set node name
@@ -125,7 +138,7 @@ class Htmlr(list):
         # set data
         self._datalist = []
         self._datadict = {}
-        self._addend = False
+        self._inited = True
         update_templates(self)
 
     def __eq__(self, other):
@@ -140,34 +153,31 @@ class Htmlr(list):
             obj = Htmlr(name)
             if self._namespace:
                 obj._namespace = self._namespace
+        obj._inited = False
         if self._name is None:
             self.append(obj)
-            self._addend = True
             return self
         else:
             objs = Htmlr(self, obj)
-            objs._addend = True
             return objs
-            return objs.addend
-            # return add function of new object, but have function return 
-            # a reference to the list
-            # return objs.addend.__get__(objs,objs.__class__)
 
     def __call__(self, *nodes, **attributes):
-        if self._name is None:
-            if self._addend:
-                self._addend = False
-                self[-1](*nodes, **attributes)
-            else:
-                if len(self) == 0:
-                    self.extend(nodes)
-                else:
+        if self._inited:
+            if self._name is None and len(self) > 0:
+                if self[-1]._inited:
                     for item in self:
-                        item(*nodes, **attributes)
+                        item.extend(nodes)
+                        item._attributes.update(attributes)
+                else:
+                    try:
+                        self[-1].__init__(*nodes, **attributes)
+                    except TypeError:
+                        self[-1] = self[-1](*nodes, **attributes)
+            else:
+                super(Htmlr, self).extend(nodes)
+                self._attributes.update(attributes)
         else:
-            super(Htmlr, self).extend(nodes)
-            self._attributes.update(attributes)
-        update_templates(self)
+            self.__init__(*nodes, **attributes)
         return self
 
     def __iadd__(self, other):
@@ -200,12 +210,6 @@ class Htmlr(list):
         return self
 
     def extend(self, items):
-#        append = super(Htmlr, self).append
-#        for item in items:
-#            if isinstance(item, HtmlrMeta):
-#                append(item())
-#            else:
-#                append(item)
         super(Htmlr, self).extend(items)
         return self
 
@@ -223,12 +227,6 @@ class Htmlr(list):
         return self
     # the list functions pop, index and count already return data and can not
     #     be used in a cascading style
-
-    def each(self, *itemlist, **itemdict):
-        return HtmlrEach(self, *itemlist, **itemdict)
-
-    def extract(self, *extracts):
-        return HtmlrExtract(self, *extracts)
 
     def format(self, *datalist, **datadict):
         self._datalist.extend(datalist)
@@ -260,7 +258,7 @@ class Htmlr(list):
                     result += INDENT * (indent + 1) + '*lit ' + str(node) + '\n'
             return result
 
-    def get_open_tag(self):
+    def _get_open_tag(self):
         xml = ['<']
         if self._namespace is not None:
             xml.append(self._namespace)
@@ -279,7 +277,7 @@ class Htmlr(list):
         xml.append('>')
         return HtmlrString(''.join(xml))
 
-    def get_close_tag(self):
+    def _get_close_tag(self):
         if self._close and (self or not self and not self._empty_element):
             xml = ['</']
             if self._namespace is not None:
@@ -291,7 +289,7 @@ class Htmlr(list):
         else:
             return HtmlrString('')
 
-    def compile_nodes(self):
+    def _compile_nodes(self):
         nodes = HtmlrString()
         for node in self:
             try:
@@ -301,13 +299,13 @@ class Htmlr(list):
         return nodes
 
     def compile(self):
-        nodes = self.compile_nodes()
+        nodes = self._compile_nodes()
         if self._name is None:
             return nodes
         else:
-            return self.get_open_tag() + nodes + self.get_close_tag()
+            return self._get_open_tag() + nodes + self._get_close_tag()
 
-    def render_nodes(self, *datalist, **datadict):
+    def _render_nodes(self, *datalist, **datadict):
         nodes = HtmlrString()
         for node in self:
             try:
@@ -316,77 +314,33 @@ class Htmlr(list):
                 nodes += str(node)
         return nodes
 
-        s = ['']
-        for node in self:
-            result = node.render(*datalist, **datadict)
-            if isinstance(result, Htmlr) or isinstance(s[-1], Htmlr):
-                if len(result) <= 1:
-                    s.append(result)
-                else:
-                    # should have len >= 3
-                    s[-1] += result.pop(0)
-                    s.extend(result)
-            else:
-                s[-1] = s[-1] + result
-        if isinstance(s[-1], Htmlr):
-            s.append('')
-        if len(s) == 1:
-            return s[0]
-        else:
-            return self.__class__().extend(s)
-
     def render(self, *datalist, **datadict):
-        nodes = self.render_nodes(*datalist, **datadict)
+        nodes = self._render_nodes(*datalist, **datadict)
         if self._name is None:
             return nodes
         else:
-            return self.get_open_tag() + nodes + self.get_close_tag()
-
-        if self._name is None:
-            return nodes
-        else:
-            if isinstance(nodes, Htmlr):
-                nodes[0] = self.get_open_tag() + nodes[0] + self.get_close_tag()
-                result = self.__class__().extend(nodes)
-            else:
-                result = '<' + self._name + '>' + nodes
-            return result
-
-
-def each(*itemlist, **itemdict):
-    def wrapper(*nodes):
-        if len(nodes) == 1:
-            return HtmlrEach(nodes[0], *itemlist, **itemdict)
-        else:
-            return HtmlrEach(Htmlr(*nodes), *itemlist, **itemdict)
-    return wrapper
+            return self._get_open_tag() + nodes + self._get_close_tag()
 
 
 class HtmlrEach(Htmlr):
 
-    def __init__(self, node, *itemlist, **itemdict):
-        if isinstance(node, HtmlrMeta):
-            node = node()
-        if isinstance(node, Htmlr):
-            self._name = node._name
-            self._namespace = node._namespace
-            self._attributes = node._attributes
-            self._datalist = list(itemlist) or node._datalist
-            self._datadict = itemdict or node._datadict
-            self.extend(node)
+    def __init__(self, *itemlist, **itemdict):
+        if self._inited is None:
+            self._inited = True
+            self(*itemlist, **itemdict)
         else:
-            self._name = None
             self._datalist = list(itemlist)
             self._datadict = itemdict
-            self.append(node)
+            self._inited = None
+            update_templates(self)
 
     def display(self, indent=0, *datalist, **datadict):
         data = self._datalist or self._datadict or datalist or datadict or None
         result = HtmlrString(''.join((INDENT * indent,
                                       '+each-{0}{1}'.format(self._datalist, self._datadict), ' ',
-                                      str(data), ' ',
-                                      str(datadict), ' ',
-                                      str(list(datalist)),
+                                      str(data),
+#                                      ' ', str(datadict),
+#                                      ' ', str(list(datalist)),
                                       '\n')))
         if data is None:
             result += super(HtmlrEach, self).display(indent + 1)
@@ -414,7 +368,7 @@ class HtmlrEach(Htmlr):
     def compile(self):
         nodes = HtmlrString()
         if not (self._datalist or self._datadict):
-            nodes += self.__class__(super(HtmlrEach, self).compile())
+            nodes += self.__class__()(super(HtmlrEach, self).compile())
             return nodes
         else:
             data = self._datalist or self._datadict
@@ -468,34 +422,21 @@ class HtmlrEach(Htmlr):
                     s.append(super(HtmlrEach, self).render())
         return HtmlrString(''.join(s))
 
-def extract(*extracts):
-    def wrapper(*nodes):
-        if len(nodes) == 1:
-            return HtmlrExtract(nodes[0], *extracts)
-        else:
-            return HtmlrExtract(Htmlr(*nodes), *extracts)
-    return wrapper
+class each(HtmlrEach): pass
+
 
 class HtmlrExtract(Htmlr):
 
-    def __init__(self, node, *extracts):
-        if isinstance(node, HtmlrMeta):
-            node = node()
-        if isinstance(node, Htmlr):
-            self._name = node._name
-            self._namespace = node._namespace
-            self._attributes = node._attributes
-            self._datalist = node._datalist
-            self._datadict = node._datadict
-            self.extend(node)
+    def __init__(self, *extracts, **kwds):
+        if self._inited is None:
+            self._inited = True
+            self(*extracts, **kwds)
         else:
-            self._name = None
             self._datalist = []
             self._datadict = {}
-            self.append(node)
-        self._extracts = extracts if len(extracts) > 0 else None
-        update_templates(self)
-
+            self._extracts = extracts if len(extracts) > 0 else None
+            self._inited = None
+            update_templates(self)
 
     def extract_data(self, datalist, datadict):
         data = None
@@ -516,9 +457,9 @@ class HtmlrExtract(Htmlr):
         data = self.extract_data(datalist, datadict)
         result = HtmlrString(''.join((INDENT * indent,
                                       '=extract-{0}'.format(self._extracts), ' ',
-                                      str(data), ' ',
-                                      str(datadict), ' ',
-                                      str(list(datalist)),
+                                      str(data),
+#                                      ' ', str(datadict),
+#                                      ' ', str(list(datalist)),
                                       '\n')))
         if data is None:
             return result + super(HtmlrExtract, self).display(indent + 1)
@@ -535,8 +476,11 @@ class HtmlrExtract(Htmlr):
 
     def compile(self):
         nodes = HtmlrString()
-        nodes += self.__class__(super(HtmlrExtract, self).compile(), *self._extracts)
+        nodes += self.__class__(*self._extracts)(super(HtmlrExtract, self).compile())
         return nodes
+
+class extract(HtmlrExtract): pass
+
 
 # keeps list of subclassed htmlr objects for chaining syntax
 _chain_classes = {'Htmlr': Htmlr}
@@ -546,7 +490,7 @@ def update_classes():
         for sub in cls.__subclasses__():
             if sub.__name__ not in _classes:
                 _classes[sub.__name__] = sub
-                itersubclasses(cls)
+                itersubclasses(sub)
     itersubclasses(Htmlr)
     _chain_classes.update(_classes)
 

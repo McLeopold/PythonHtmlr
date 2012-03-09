@@ -33,46 +33,69 @@ class TestHtmlrs(unittest.TestCase):
 
     def test_each(self):
         n = each()(div)
-        self.assertEqual(n.display(), "+each-[]{} None {} []\n"
+        self.assertEqual(n.display(), "+each-[]{} None\n"
                                       "    div {} []\n")
 
     def test_each_const(self):
         n = each('a', 'b')(div)
-        self.assertEqual(n.display(), "+each-['a', 'b']{} ['a', 'b'] {} []\n"
+        self.assertEqual(n.display(), "+each-['a', 'b']{} ['a', 'b']\n"
+                                      "    div {} ['a']\n"
+                                      "    div {} ['b']\n")
+
+    def test_each_chain(self):
+        n = div.each('a', 'b')(div)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-['a', 'b']{} ['a', 'b']\n"
                                       "    div {} ['a']\n"
                                       "    div {} ['b']\n")
 
     def test_extract(self):
         n = extract('key')(div)
-        self.assertEqual(n.display(), "=extract-('key',) None {} []\n"
+        self.assertEqual(n.display(), "=extract-('key',) None\n"
+                                      "    div {} []\n")
+
+    def test_extract_chain(self):
+        n = div.extract('key')(div)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "=extract-('key',) None\n"
                                       "    div {} []\n")
 
     def test_compile_simple(self):
         n = html(head, body)
         c = n.compile()
-        self.assertEqual(c.display(), "*str <html><head /><body /></html>\n")
+        self.assertEqual(c.display(), "*str <html><head /><body /></html> [] {}\n")
+
+
 
     def test_compile_extract(self):
-        n = table(thead, extract('fields')(tbody))
+        n = table(
+                thead,
+                extract('fields')(tbody)
+            )
         c = n.compile()
-        self.assertEqual(c.display(), "*str <table><thead />\n"
-                                      "=extract-('fields',) None {} []\n"
-                                      "    *str <tbody />\n"
-                                      "*str </table>\n")
+        self.assertEqual(c.display(), "*str <table><thead /> [] {}\n"
+                                      "=extract-('fields',) None\n"
+                                      "    *str <tbody /> [] {}\n"
+                                      "*str </table> [] {}\n")
 
     def test_compile_each(self):
-        n = table(thead(tr(each()(th))))
+        n = table(
+                thead(
+                    tr(
+                       each.th
+                    )
+                )
+            )
         c = n.compile()
-        d = c.display()
-        self.assertEqual(c.display(), "*str <table><thead><tr>\n"
-                                      "+each-[]{} None {} []\n"
-                                      "    *str <th />\n"
-                                      "*str </tr></thead></table>\n")
+        self.assertEqual(c.display(), "*str <table><thead><tr> [] {}\n"
+                                      "+each-[]{} None\n"
+                                      "    *str <th /> [] {}\n"
+                                      "*str </tr></thead></table> [] {}\n")
 
     def test_compile_each_const(self):
         n = each(1, 2)(div)
         c = n.compile()
-        self.assertEqual(c.display(), "*str <div /><div />\n")
+        self.assertEqual(c.display(), "*str <div /><div /> [] {}\n")
 
     def test_sample_page(self):
         n = doctype.html(
@@ -101,13 +124,13 @@ class TestHtmlrs(unittest.TestCase):
             tbody(each()(tr(each()(td())))),
             tfoot(tr(each(*fields)(th()))))
         c = n.compile()
-        self.assertEqual(c.display(), "*str <table><thead><tr><th /><th /></tr></thead><tbody>\n"
-                                      "+each-[]{} None {} []\n"
-                                      "    *str <tr>\n"
-                                      "    +each-[]{} None {} []\n"
-                                      "        *str <td />\n"
-                                      "    *str </tr>\n"
-                                      "*str </tbody><tfoot><tr><th /><th /></tr></tfoot></table>\n")
+        self.assertEqual(c.display(), "*str <table><thead><tr><th /><th /></tr></thead><tbody> [] {}\n"
+                                      "+each-[]{} None\n"
+                                      "    *str <tr> [] {}\n"
+                                      "    +each-[]{} None\n"
+                                      "        *str <td /> [] {}\n"
+                                      "    *str </tr> [] {}\n"
+                                      "*str </tbody><tfoot><tr><th /><th /></tr></tfoot></table> [] {}\n")
 
 if __name__ == '__main__':
     unittest.main()
