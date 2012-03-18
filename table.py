@@ -23,13 +23,12 @@ t = doctype.html(
 )
 
 if __name__ == "__main__":
+    import xml.dom.minidom
+
     data = {'title': 'sample table',
             'data': [{'name': 'scott',
                       'id': 1},
                      {'name': 'mike',
                       'id': 2}]}
-    print(t.display(**data))
-    print(t.render(**data))
     c = t.compile()
-    print(c.display(**data))
-    print(c.render(**data))
+    print(xml.dom.minidom.parseString(c.render(**data)).toprettyxml())

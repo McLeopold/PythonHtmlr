@@ -1,7 +1,8 @@
 import unittest
 from htmlr import *
 
-class TestHtmlrs(unittest.TestCase):
+@unittest.skip
+class TestHtmlr(unittest.TestCase):
 
     def test_node(self):
         n = div()
@@ -131,6 +132,454 @@ class TestHtmlrs(unittest.TestCase):
                                       "        *str <td /> [] {}\n"
                                       "    *str </tr> [] {}\n"
                                       "*str </tbody><tfoot><tr><th /><th /></tr></tfoot></table> [] {}\n")
+
+    def test_node_render(self):
+        n = div(class_="test")(disabled=None)(section("Woot!"))
+        self.assertEqual(n.render(), '<div class="test" disabled><section>Woot!</section></div>')
+
+    def test_each_const_render(self):
+        n = ul(each(1, 2, 3)(li("{0}")))
+        self.assertEqual(n.render(), "<ul><li>1</li><li>2</li><li>3</li></ul>")
+
+    def test_extract_render(self):
+        data = {'data': ["test"]}
+        n = div.extract('data')(div(class_="{0}"))
+        self.assertEqual(n.render(**data), '<div /><div class="test" />')
+
+
+class TestHtmlrEach(unittest.TestCase):
+
+    def gen(self, n, p=True):
+        c = n.compile()
+        nr = n.render()
+        cr = c.render()
+        if p:
+            print(n.display())
+            print(c.display())
+            print(nr)
+            print(cr)
+        return c, nr, cr
+
+    def test_each(self):
+        n = each
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n")
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_call(self):
+        n = each()
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n")
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_const_list(self):
+        n = each(1, 2)
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n")
+        self.assertEqual(c.display(), "")
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_div(self):
+        n = each.div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n"
+                                      "    *str <div /> [] {}\n")
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_div2(self):
+        n = each.div(class_="test")
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n"
+                                      '    *str <div class="test" /> [] {}\n')
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_div_div(self):
+        n = each.div.div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n"
+                                      "    div {} []\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n"
+                                      "    *str <div /><div /> [] {}\n")
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_div_div2(self):
+        n = each.div(class_="test").div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n"
+                                      "    div {} []\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n"
+                                      '    *str <div class="test" /><div /> [] {}\n')
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_call_div(self):
+        n = each().div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n"
+                                      "    *str <div /> [] {}\n")
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_call_div2(self):
+        n = each().div(class_="test")
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n"
+                                      '    *str <div class="test" /> [] {}\n')
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_call_div_div(self):
+        n = each().div.div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n"
+                                      "    div {} []\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n"
+                                      "    *str <div /><div /> [] {}\n")
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_call_div_div2(self):
+        n = each().div(class_="test").div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n"
+                                      "    div {} []\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n"
+                                      '    *str <div class="test" /><div /> [] {}\n')
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_call_div_div3(self):
+        n = each()(div).div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n"
+                                      "    div {} []\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n"
+                                      "    *str <div /><div /> [] {}\n")
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_call_div_div4(self):
+        n = each()(div)(div)
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[]{} None\n"
+                                      "    div {} []\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "+each-[]{} None\n"
+                                      "    *str <div /><div /> [] {}\n")
+        self.assertEqual(nr, "")
+        self.assertEqual(cr, "")
+
+    def test_each_const_div(self):
+        n = each(1, 2).div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+                                      "    div {} [1]\n"
+                                      "    div {} [2]\n")
+        self.assertEqual(c.display(), "*str <div /><div /> [] {}\n")
+        self.assertEqual(nr, "<div /><div />")
+        self.assertEqual(cr, "<div /><div />")
+
+    def test_each_const_div2(self):
+        n = each(1, 2).div(class_="test")
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+                                      "    div {} [1]\n"
+                                      "    div {} [2]\n")
+        self.assertEqual(c.display(), '*str <div class="test" /><div class="test" /> [] {}\n')
+        self.assertEqual(nr, '<div class="test" /><div class="test" />')
+        self.assertEqual(cr, '<div class="test" /><div class="test" />')
+
+    def test_each_const_div_div(self):
+        n = each(1, 2).div.div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+                                      "    div {} [1]\n"
+                                      "    div {} [1]\n"
+                                      "    div {} [2]\n"
+                                      "    div {} [2]\n")
+        self.assertEqual(c.display(), "*str <div /><div /><div /><div /> [] {}\n")
+        self.assertEqual(nr, "<div /><div /><div /><div />")
+        self.assertEqual(cr, "<div /><div /><div /><div />")
+
+    def test_each_const_div_div2(self):
+        n = each(1, 2).div(class_="test").div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+                                      "    div {} [1]\n"
+                                      "    div {} [1]\n"
+                                      "    div {} [2]\n"
+                                      "    div {} [2]\n")
+        self.assertEqual(c.display(), '*str <div class="test" /><div /><div class="test" /><div /> [] {}\n')
+        self.assertEqual(nr, '<div class="test" /><div /><div class="test" /><div />')
+        self.assertEqual(cr, '<div class="test" /><div /><div class="test" /><div />')
+
+    def test_each_const_div_div3(self):
+        n = each(1, 2)(div).div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+                                      "    div {} [1]\n"
+                                      "    div {} [1]\n"
+                                      "    div {} [2]\n"
+                                      "    div {} [2]\n")
+        self.assertEqual(c.display(), "*str <div /><div /><div /><div /> [] {}\n")
+        self.assertEqual(nr, "<div /><div /><div /><div />")
+        self.assertEqual(cr, "<div /><div /><div /><div />")
+
+    def test_each_const_div_div4(self):
+        n = each(1, 2)(div)(div)
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+                                      "    div {} [1]\n"
+                                      "    div {} [1]\n"
+                                      "    div {} [2]\n"
+                                      "    div {} [2]\n")
+        self.assertEqual(c.display(), "*str <div /><div /><div /><div /> [] {}\n")
+        self.assertEqual(nr, "<div /><div /><div /><div />")
+        self.assertEqual(cr, "<div /><div /><div /><div />")
+
+    def test_div_each(self):
+        n = div.each
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-[]{} None\n")
+        self.assertEqual(c.display(), "*str <div /> [] {}\n"
+                                      "+each-[]{} None\n")
+        self.assertEqual(nr, "<div />")
+        self.assertEqual(cr, "<div />")
+
+    def test_div_each_call(self):
+        n = div.each()
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-[]{} None\n")
+        self.assertEqual(c.display(), "*str <div /> [] {}\n"
+                                      "+each-[]{} None\n")
+        self.assertEqual(nr, "<div />")
+        self.assertEqual(cr, "<div />")
+
+    def test_div_each_const_list(self):
+        n = div.each(1, 2)
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-[1, 2]{} [1, 2]\n")
+        self.assertEqual(c.display(), "*str <div /> [] {}\n")
+        self.assertEqual(nr, "<div />")
+        self.assertEqual(cr, "<div />")
+
+    def test_div_each_div(self):
+        n = div.each.div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-[]{} None\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "*str <div /> [] {}\n"
+                                      "+each-[]{} None\n"
+                                      "    *str <div /> [] {}\n")
+        self.assertEqual(nr, "<div />")
+        self.assertEqual(cr, "<div />")
+
+    def test_div_each_div2(self):
+        n = div.each.div(class_="test")
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-[]{} None\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "*str <div /> [] {}\n"
+                                      "+each-[]{} None\n"
+                                      '    *str <div class="test" /> [] {}\n')
+        self.assertEqual(nr, "<div />")
+        self.assertEqual(cr, "<div />")
+
+    def test_div_each_div_div(self):
+        n = div.each.div.div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-[]{} None\n"
+                                      "    div {} []\n"
+                                      "div {} []\n")
+        self.assertEqual(c.display(), "*str <div /> [] {}\n"
+                                      "+each-[]{} None\n"
+                                      "    *str <div /> [] {}\n"
+                                      "*str <div /> [] {}\n")
+        self.assertEqual(nr, "<div /><div />")
+        self.assertEqual(cr, "<div /><div />")
+
+    def test_div_each_div_div2(self):
+        n = div.each.div(class_="test").div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-[]{} None\n"
+                                      "    div {} []\n"
+                                      "div {} []\n")
+        self.assertEqual(c.display(), "*str <div /> [] {}\n"
+                                      "+each-[]{} None\n"
+                                      '    *str <div class="test" /> [] {}\n'
+                                      "*str <div /> [] {}\n")
+        self.assertEqual(nr, "<div /><div />")
+        self.assertEqual(cr, "<div /><div />")
+
+    def test_div_each_call_div(self):
+        n = div.each().div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-[]{} None\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "*str <div /> [] {}\n"
+                                      "+each-[]{} None\n"
+                                      '    *str <div /> [] {}\n')
+        self.assertEqual(nr, "<div />")
+        self.assertEqual(cr, "<div />")
+
+    def test_div_each_call_div2(self):
+        n = div.each().div(class_="test")
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-[]{} None\n"
+                                      "    div {} []\n")
+        self.assertEqual(c.display(), "*str <div /> [] {}\n"
+                                      "+each-[]{} None\n"
+                                      '    *str <div class="test" /> [] {}\n')
+        self.assertEqual(nr, "<div />")
+        self.assertEqual(cr, "<div />")
+
+    def test_div_each_call_div_div(self):
+        n = div.each().div.div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-[]{} None\n"
+                                      "    div {} []\n"
+                                      "div {} []\n")
+        self.assertEqual(c.display(), "*str <div /> [] {}\n"
+                                      "+each-[]{} None\n"
+                                      '    *str <div /> [] {}\n'
+                                      '*str <div /> [] {}\n')
+        self.assertEqual(nr, "<div /><div />")
+        self.assertEqual(cr, "<div /><div />")
+
+    def test_div_each_call_div_div2(self):
+        n = div.each().div(class_="test").div
+        c, nr, cr = self.gen(n, False)
+        self.assertEqual(n.display(), "div {} []\n"
+                                      "+each-[]{} None\n"
+                                      "    div {} []\n"
+                                      "div {} []\n")
+        self.assertEqual(c.display(), "*str <div /> [] {}\n"
+                                      "+each-[]{} None\n"
+                                      '    *str <div class="test" /> [] {}\n'
+                                      '*str <div /> [] {}\n')
+        self.assertEqual(nr, "<div /><div />")
+        self.assertEqual(cr, "<div /><div />")
+
+#    def test_each_call_div_div3(self):
+#        n = each()(div).div
+#        c, nr, cr = self.gen(n, False)
+#        self.assertEqual(n.display(), "+each-[]{} None\n"
+#                                      "    div {} []\n"
+#                                      "    div {} []\n")
+#        self.assertEqual(c.display(), "+each-[]{} None\n"
+#                                      "    *str <div /><div /> [] {}\n")
+#        self.assertEqual(nr, "")
+#        self.assertEqual(cr, "")
+#
+#    def test_each_call_div_div4(self):
+#        n = each()(div)(div)
+#        c, nr, cr = self.gen(n, False)
+#        self.assertEqual(n.display(), "+each-[]{} None\n"
+#                                      "    div {} []\n"
+#                                      "    div {} []\n")
+#        self.assertEqual(c.display(), "+each-[]{} None\n"
+#                                      "    *str <div /><div /> [] {}\n")
+#        self.assertEqual(nr, "")
+#        self.assertEqual(cr, "")
+#
+#    def test_each_const_div(self):
+#        n = each(1, 2).div
+#        c, nr, cr = self.gen(n, False)
+#        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+#                                      "    div {} [1]\n"
+#                                      "    div {} [2]\n")
+#        self.assertEqual(c.display(), "*str <div /><div /> [] {}\n")
+#        self.assertEqual(nr, "<div /><div />")
+#        self.assertEqual(cr, "<div /><div />")
+#
+#    def test_each_const_div2(self):
+#        n = each(1, 2).div()
+#        c, nr, cr = self.gen(n, False)
+#        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+#                                      "    div {} [1]\n"
+#                                      "    div {} [2]\n")
+#        self.assertEqual(c.display(), "*str <div /><div /> [] {}\n")
+#        self.assertEqual(nr, "<div /><div />")
+#        self.assertEqual(cr, "<div /><div />")
+#
+#    def test_each_const_div_div(self):
+#        n = each(1, 2).div.div
+#        c, nr, cr = self.gen(n, False)
+#        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+#                                      "    div {} [1]\n"
+#                                      "    div {} [1]\n"
+#                                      "    div {} [2]\n"
+#                                      "    div {} [2]\n")
+#        self.assertEqual(c.display(), "*str <div /><div /><div /><div /> [] {}\n")
+#        self.assertEqual(nr, "<div /><div /><div /><div />")
+#        self.assertEqual(cr, "<div /><div /><div /><div />")
+#
+#    def test_each_const_div_div2(self):
+#        n = each(1, 2).div().div
+#        c, nr, cr = self.gen(n, False)
+#        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+#                                      "    div {} [1]\n"
+#                                      "    div {} [1]\n"
+#                                      "    div {} [2]\n"
+#                                      "    div {} [2]\n")
+#        self.assertEqual(c.display(), "*str <div /><div /><div /><div /> [] {}\n")
+#        self.assertEqual(nr, "<div /><div /><div /><div />")
+#        self.assertEqual(cr, "<div /><div /><div /><div />")
+#
+#    def test_each_const_div_div3(self):
+#        n = each(1, 2)(div).div
+#        c, nr, cr = self.gen(n, False)
+#        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+#                                      "    div {} [1]\n"
+#                                      "    div {} [1]\n"
+#                                      "    div {} [2]\n"
+#                                      "    div {} [2]\n")
+#        self.assertEqual(c.display(), "*str <div /><div /><div /><div /> [] {}\n")
+#        self.assertEqual(nr, "<div /><div /><div /><div />")
+#        self.assertEqual(cr, "<div /><div /><div /><div />")
+#
+#    def test_each_const_div_div4(self):
+#        n = each(1, 2)(div)(div)
+#        c, nr, cr = self.gen(n, False)
+#        self.assertEqual(n.display(), "+each-[1, 2]{} [1, 2]\n"
+#                                      "    div {} [1]\n"
+#                                      "    div {} [1]\n"
+#                                      "    div {} [2]\n"
+#                                      "    div {} [2]\n")
+#        self.assertEqual(c.display(), "*str <div /><div /><div /><div /> [] {}\n")
+#        self.assertEqual(nr, "<div /><div /><div /><div />")
+#        self.assertEqual(cr, "<div /><div /><div /><div />")
 
 if __name__ == '__main__':
     unittest.main()

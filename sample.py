@@ -6,6 +6,8 @@ doctype.html(
         title("htmlr")
     ),
     body(
-        h1("Hello World")
+        h1("Hello World"),
+        comment("woot!",
+                h2("test"))
     )
 )

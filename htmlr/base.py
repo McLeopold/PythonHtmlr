@@ -24,6 +24,7 @@ def update_templates(item):
 
 
 class HtmlrString(str):
+    _inited = True
 
     def __init__(self, value=''):
         self._name = None
@@ -76,6 +77,11 @@ class HtmlrString(str):
                               '\n'))
             return result
 
+    def render(self, *datalist, **datadict):
+        try:
+            return HtmlrString(self.format(*datalist, **datadict))
+        except NameError:
+            return self
 
 class HtmlrMeta(type):
 
@@ -99,7 +105,7 @@ class Htmlr(list):
     _namespace = None
     _nodes = []
     _attributes = OrderedDict()
-    _alias = {'class_', 'class'}
+    _alias = {'class_': 'class'}
     _close = True
     _empty_element = True
     _inited = False
@@ -155,7 +161,12 @@ class Htmlr(list):
                 obj._namespace = self._namespace
         obj._inited = False
         if self._name is None:
-            self.append(obj)
+            # each in a chain causes next element to be child of each
+            if len(self) > 0 and isinstance(self[-1], (HtmlrEach, HtmlrExtract)) and len(self[-1]) == 0:
+                self[-1].append(obj)
+                self[-1]._inited = 0
+            else:
+                self.append(obj)
             return self
         else:
             objs = Htmlr(self, obj)
@@ -165,9 +176,11 @@ class Htmlr(list):
         if self._inited:
             if self._name is None and len(self) > 0:
                 if self[-1]._inited:
-                    for item in self:
-                        item.extend(nodes)
-                        item._attributes.update(attributes)
+                    super(Htmlr, self).extend(nodes)
+                    self._attributes.update(attributes)
+#                    for item in self:
+#                        item.extend(nodes)
+#                        item._attributes.update(attributes)
                 else:
                     try:
                         self[-1].__init__(*nodes, **attributes)
@@ -178,6 +191,11 @@ class Htmlr(list):
                 self._attributes.update(attributes)
         else:
             self.__init__(*nodes, **attributes)
+        # ensure last node is inited
+        if len(self) > 0 and not self[-1]._inited:
+            if isinstance(self[-1], HtmlrMeta):
+                self[-1] = self[-1]()
+            self[-1]._inited = True
         return self
 
     def __iadd__(self, other):
@@ -317,9 +335,14 @@ class Htmlr(list):
     def render(self, *datalist, **datadict):
         nodes = self._render_nodes(*datalist, **datadict)
         if self._name is None:
-            return nodes
+            result = nodes
         else:
-            return self._get_open_tag() + nodes + self._get_close_tag()
+            result = self._get_open_tag() + nodes + self._get_close_tag()
+        try:
+            result = result.format(*datalist, **datadict)
+        except Exception as exc:
+            pass
+        return result
 
 
 class HtmlrEach(Htmlr):
@@ -328,6 +351,9 @@ class HtmlrEach(Htmlr):
         if self._inited is None:
             self._inited = True
             self(*itemlist, **itemdict)
+        elif not self._inited and type(self._inited) == int:
+            self[-1](*itemlist, **itemdict)
+            self._inited = True
         else:
             self._datalist = list(itemlist)
             self._datadict = itemdict
@@ -342,85 +368,42 @@ class HtmlrEach(Htmlr):
 #                                      ' ', str(datadict),
 #                                      ' ', str(list(datalist)),
                                       '\n')))
-        if data is None:
-            result += super(HtmlrEach, self).display(indent + 1)
-        else:
-            try:
-                # assume mapping
-                for key, value in data.items():
-                    result += super(HtmlrEach, self).display(indent + 1, key=key, value=value)
-            except AttributeError as exc:
-                try:
-                    for item in data:
-                        try:
-                            result += super(HtmlrEach, self).display(indent + 1, **item)
-                        except TypeError:
-                            try:
-                                if isinstance(item, (str, unicode)):
-                                    raise TypeError
-                                result += super(HtmlrEach, self).display(indent + 1, *item)
-                            except TypeError:
-                                result += super(HtmlrEach, self).display(indent + 1, item)
-                except TypeError:
-                    result += super(HtmlrEach, self).display(indent + 1)
+        result += miter(super(HtmlrEach, self).display, data, indent + 1)
         return result
 
     def compile(self):
-        nodes = HtmlrString()
-        if not (self._datalist or self._datadict):
-            nodes += self.__class__()(super(HtmlrEach, self).compile())
-            return nodes
+        data = self._datalist or self._datadict or None
+        if not data:
+            return self.__class__()(super(HtmlrEach, self).compile())
         else:
-            data = self._datalist or self._datadict
-            try:
-                # assume mapping
-                for key, value in data.items():
-                    nodes += super(HtmlrEach, self).render(key=key, value=value)
-            except AttributeError as exc:
-                try:
-                    for item in data:
-                        try:
-                            nodes += super(HtmlrEach, self).render(**item)
-                        except TypeError:
-                            try:
-                                if isinstance(item, (str, unicode)):
-                                    raise TypeError
-                                nodes += super(HtmlrEach, self).render(*item)
-                            except TypeError:
-                                nodes += super(HtmlrEach, self).render(item)
-                except TypeError:
-                    nodes += super(HtmlrEach, self).render()
+            nodes = HtmlrString()
+            nodes += miter(super(HtmlrEach, self).render, data)
         return nodes
 
     def render(self, *datalist, **datadict):
         data = self._datalist or self._datadict or datalist or datadict or None
-        data = datalist or datadict or None
-        if self._name is None:
-            s = []
-        else:
-            s = ['<' + self._name + '>']
-        if data is None:
-            s.append(super(HtmlrEach, self).render())
-        else:
+        nodes = HtmlrString()
+        if data:
+            nodes += miter(super(HtmlrEach, self).render, data)
+        return nodes
+
+def miter(fn, data, *args):
+    result = HtmlrString()
+    if data is None:
+        return fn(*args)
+    else:
+        try:
+            for key, value in data.items():
+                result += fn(key=key, value=value)
+        except AttributeError:
             try:
-                # assume mapping
-                for key, value in data.items():
-                    s.append(super(HtmlrEach, self).render(key=key, value=value))
-            except AttributeError as exc:
-                try:
-                    for item in data:
-                        try:
-                            s.append(super(HtmlrEach, self).render(**item))
-                        except TypeError:
-                            try:
-                                if isinstance(item, (str, unicode)):
-                                    raise TypeError
-                                s.append(super(HtmlrEach, self).render(*item))
-                            except TypeError:
-                                s.append(super(HtmlrEach, self).render(item))
-                except TypeError:
-                    s.append(super(HtmlrEach, self).render())
-        return HtmlrString(''.join(s))
+                if isinstance(data, (str, unicode)):
+                    raise TypeError
+                for item in data:
+                    result += mapply(fn, item, *args)
+            except TypeError:
+                result += fn()
+    return result
 
 class each(HtmlrEach): pass
 
@@ -464,20 +447,36 @@ class HtmlrExtract(Htmlr):
         if data is None:
             return result + super(HtmlrExtract, self).display(indent + 1)
         else:
-            try:
-                return result + super(HtmlrExtract, self).display(indent + 1, **data)
-            except TypeError:
-                try:
-                    if isinstance(data, (str, unicode)):
-                        raise TypeError
-                    return result + super(HtmlrExtract, self).display(indent + 1, *data)
-                except TypeError:
-                    return result + super(HtmlrExtract, self).display(indent + 1, data)
+            return result + mapply(super(HtmlrExtract, self).display, data, indent + 1)
 
     def compile(self):
         nodes = HtmlrString()
         nodes += self.__class__(*self._extracts)(super(HtmlrExtract, self).compile())
         return nodes
+
+    def render(self, *datalist, **datadict):
+        data = self.extract_data(datalist, datadict)
+        if data is None:
+            return super(HtmlrExtract, self).render()
+        else:
+            result = mapply(super(HtmlrExtract, self).render, data)
+            try:
+                return mapply(result.format, data)
+            except TypeError:
+                return result
+
+def mapply(fn, data, *args):
+    if data is None:
+        return fn(*args)
+    try:
+        return fn(*args, **data)
+    except TypeError:
+        try:
+            if isinstance(data, (str, unicode)):
+                raise TypeError
+            return fn(*(args + tuple(data)))
+        except:
+            return fn(*(args + (data,)))
 
 class extract(HtmlrExtract): pass
 
