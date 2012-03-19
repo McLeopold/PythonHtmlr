@@ -98,6 +98,9 @@ class HtmlrMeta(type):
             return self().__getattribute__(name)
         return type.__getattribute__(self, name)
 
+    # shortcut for tags with id's: div["one"]
+    def __getitem__(self, name):
+        return self(id=name)
 
 class Htmlr(list):
     __metaclass__ = HtmlrMeta
@@ -195,7 +198,7 @@ class Htmlr(list):
         if len(self) > 0 and not self[-1]._inited:
             if isinstance(self[-1], HtmlrMeta):
                 self[-1] = self[-1]()
-            self[-1]._inited = True
+            #self[-1]._inited = True
         return self
 
     def __iadd__(self, other):
@@ -221,6 +224,16 @@ class Htmlr(list):
             else:
                 self.extend(other)
             return self
+
+    def __contains__(self, item):
+        if super(Htmlr, self).__contains__(item):
+            return True
+        else:
+            for subitem in self:
+                if isinstance(subitem, Htmlr):
+                    if item in subitem:
+                        return True
+        return False
 
     # extend built-in list functions and return self for cascading
     def append(self, item):

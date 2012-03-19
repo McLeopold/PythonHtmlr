@@ -1,7 +1,6 @@
 import unittest
 from htmlr import *
 
-@unittest.skip
 class TestHtmlr(unittest.TestCase):
 
     def test_node(self):
@@ -61,11 +60,14 @@ class TestHtmlr(unittest.TestCase):
                                       "=extract-('key',) None\n"
                                       "    div {} []\n")
 
+    def test_id(self):
+        n = div["one"]
+        self.assertEqual(n.render(), '<div id="one" />')
+
     def test_compile_simple(self):
         n = html(head, body)
         c = n.compile()
         self.assertEqual(c.display(), "*str <html><head /><body /></html> [] {}\n")
-
 
 
     def test_compile_extract(self):
