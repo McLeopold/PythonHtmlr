@@ -192,13 +192,14 @@ class Htmlr(list):
             else:
                 super(Htmlr, self).extend(nodes)
                 self._attributes.update(attributes)
+                # ensure last node is inited?
+                if len(self) > 0:
+                    if isinstance(self[-1], HtmlrMeta):
+                        self[-1] = self[-1]()
+                    elif isinstance(self[-1], Htmlr) and not self[-1]._inited:
+                        self[-1]._inited = True
         else:
             self.__init__(*nodes, **attributes)
-        # ensure last node is inited
-        if len(self) > 0 and not self[-1]._inited:
-            if isinstance(self[-1], HtmlrMeta):
-                self[-1] = self[-1]()
-            #self[-1]._inited = True
         return self
 
     def __iadd__(self, other):

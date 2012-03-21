@@ -8,6 +8,6 @@ doctype.html(
     body(
         h1("Hello World"),
         comment("woot!", h2("test")),
-        div["content"]
+        div["content"]('{0}')
     )
 )
