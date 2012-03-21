@@ -6,7 +6,7 @@ setup(
     author='Scott Hamilton',
     author_email='mcleopold@gmail.com',
     packages=['htmlr',
-              'skills.testsuite'
+              'htmlr.testsuite'
     ],
     url='http://github.com/McLeopold/PythonHtmlr/',
     license="BSD",
