@@ -517,4 +517,4 @@ def render(*datalist, **datadict):
         outfile.write('\n')
 
 __all__ = ['HtmlrMeta', 'Htmlr', 'HtmlrString', 'HtmlrExtract', 'HtmlrEach',
-           'update_classes', 'render', 'each', 'extract']
+           'update_classes', 'render', 'each', 'extract', 'templates']
