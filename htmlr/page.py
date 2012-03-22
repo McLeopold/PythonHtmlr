@@ -39,7 +39,7 @@ class style(Htmlr): pass
 class css(link):
     _name = 'link'
     def __init__(self, css_file):
-        super(style, self).__init__(rel='stylesheet', href=css_file)
+        super(css, self).__init__(rel='stylesheet', href=css_file)
 class comment(Htmlr):
     def _get_open_tag(self):
         return "<!--"

@@ -3,7 +3,9 @@ from htmlr import *
 doctype.html(
     head(lang="en")(
         meta(charset="utf-8"),
-        title("htmlr")
+        title("htmlr"),
+        css('style.css'),
+        javascript('script.js')
     ),
     body(
         h1("Hello World"),
