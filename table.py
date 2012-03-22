@@ -6,6 +6,9 @@ t = doctype.html(
         title("{title}")
     ),
     body(
+        form(
+            button(id="test", value="Test")
+        ),
         h1("{title}"),
         extract('data').table(
             thead(

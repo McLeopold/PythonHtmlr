@@ -134,11 +134,8 @@ class Htmlr(list):
             if self._namespace is None and ':' in self._name:
                 self._namespace, self._name = self._name.split(':', 1)
             # set attributes
-            self._attributes = OrderedDict()
-            if not attributes:
-                self._attributes.update(self.__class__._attributes)
-            else:
-                self._attributes.update(attributes)
+            self._attributes = OrderedDict(self.__class__._attributes)
+            self._attributes.update(attributes)
         # set nodes
         if not nodes:
             self.extend(self.__class__._nodes)
