@@ -31,8 +31,15 @@ class h7(Htmlr): pass
 # html misc tags
 class script(Htmlr):
     _empty_element = False
+class javascript(script):
+    _name = 'script'
+    def __init__(self, js_file):
+        super(javascript, self).__init__(src=js_file)
 class style(Htmlr): pass
-
+class css(link):
+    _name = 'link'
+    def __init__(self, css_file):
+        super(style, self).__init__(rel='stylesheet', href=css_file)
 class comment(Htmlr):
     def _get_open_tag(self):
         return "<!--"
